@@ -1,10 +1,6 @@
 import pymongo
-import random
 import requests
 import json
-import time
-
-from requests.models import guess_json_utf
 
 
 def filter_json_data(json_data):
@@ -16,18 +12,26 @@ def filter_json_data(json_data):
 
     for gateway in json_data:
         try:
+
+            gateway = dict(gateway[1])
             filtered_gateway = {}
             filtered_gateway['id'] = gateway['id']
             filtered_gateway['name'] = gateway['name']
             filtered_gateway['country_code'] = gateway['country_code']
+            filtered_gateway['online'] = gateway['online']
+            filtered_gateway['frequency_plan'] = gateway['attributes']['frequency_plan']
+            filtered_gateway['last_seen'] = gateway['last_seen']
 
-            if ['latitude', 'longitude'] in gateway['location']:
+            if 'latitude' in gateway['location'] and 'longitude' in gateway['location']:
                 filtered_gateway['location'] = gateway['location']
             else:
+                print('missing info')
                 continue
 
             filtered_json_data.append(filtered_gateway)
+
         except Exception as err:
+            print(err)
             print('Missing', err.args[0])
 
     return filtered_json_data
@@ -51,9 +55,7 @@ def upload_json_data(json_data, mongoclient, collection):
     return ids
 
 
-
 if __name__ == '__main__':
-
 
     mongoclient = pymongo.MongoClient("mongodb://localhost:27017/")
 
@@ -61,35 +63,16 @@ if __name__ == '__main__':
 
     with open('raw_data.json', 'w') as rawdata_file:
         json.dump(response.json(), rawdata_file)
-    
 
     with open('raw_data.json', 'r') as rawdata_file:
         raw_data = json.load(rawdata_file)
-        keys = raw_data.keys()
+        raw_items = raw_data.items()
 
-        out_items = []
-        for key in keys:
-            
-            
+    filtered_items = filter_json_data(raw_items)
+    with open('./filtered_data.json', 'w') as filtered__file:
+        json.dump(filtered_items, filtered__file)
 
-    # try:
-    #     pass
-    #     user_ids = upload_json_data(
-    #         filtered_json_data, mongoclient, 'users')
-    # except Exception as err:
-    #     raise Exception('Unable to upload data to mongo')
-
-    # skopje_center = (41.9946653, 21.4308611)
-    # scooters = generate_scooter_data(skopje_center, 200)
-    # try:
-    #     scooter_ids = upload_json_data(scooters, mongoclient, 'scooters')
-    # except Exception as err:
-    #     raise Exception('Unable to upload data to mongo')
-
-    # ride_history = generate_riding_history(user_ids, scooter_ids)
-
-    # try:
-    #     upload_json_data(ride_history, mongoclient, 'ride_history')
-    # except Exception as err:
-    #     raise Exception('Unable to upload data to mongo')
-
+    try:
+        upload_json_data(filtered_items, mongoclient, 'lora_gateways')
+    except Exception:
+        print('unable to upload to mongodb')
